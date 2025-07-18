@@ -26,7 +26,7 @@ jobs:
 
       - name: Build
         run: npm run build
-		
+
   build_project_and_sonar_scan:
     name: Build and analyze
     runs-on: ubuntu-latest
