@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 #RUN npm install --save-dev @tailwindcss/postcss
 #RUN npm ci --only=production
-RUN npm ci --omit=dev
+RUN npm ci
 COPY . .
 RUN npm run build  # Replace with your build command if different
 
