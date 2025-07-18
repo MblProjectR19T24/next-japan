@@ -70,3 +70,50 @@ jobs:
               manikcse/next-japan:latest
               manikcse/next-japan:${{ github.sha }}
         file: ./Dockerfile
+      
+  deploy:
+    runs-on: self-hosted  # Uses your EC2 runner
+    steps:
+      - name: Install Docker
+        run: |
+          # Remove old Docker versions
+          sudo apt-get remove -y docker docker-engine docker.io containerd runc
+
+          # Install dependencies
+          sudo apt-get update
+          sudo apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release
+
+          # Add Docker's GPG key
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+          # Setup repository
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          # Install Docker
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+          # Verify installation
+          sudo usermod -aG docker $USER
+          docker run hello-world
+        shell: bash
+      - name: Pull Docker Image
+        run: |
+          # For private images:
+          # echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker pull manikcse/next-japan:latest  # Replace with your image
+
+      - name: Run Docker Container
+        run: |
+          sudo docker run -d \
+            --name next-japan \
+            -p 80:80 \
+             manikcse/next-japan:latest  # Match image name above
+        # Add other options like volumes, env vars, etc.
