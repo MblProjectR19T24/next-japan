@@ -45,7 +45,6 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=sonar
-     
    	  # Uncomment the following if you add tests
       # - name: Run tests
       #   run: npm test
