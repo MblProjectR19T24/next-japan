@@ -73,11 +73,12 @@ jobs:
       
   deploy:
     runs-on: self-hosted  # Uses your EC2 runner
+    needs: buils_docker_image_and_push
     steps:
       - name: Install Docker
         run: |
           # Remove old Docker versions
-          sudo apt-get remove -y docker docker-engine docker.io containerd runc
+          # sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
           # Install dependencies
           sudo apt-get update
