@@ -114,7 +114,6 @@ jobs:
       - name: Run Docker Container
         run: |
           sudo docker run -d \
-            --name next-japan \
             -p 80:80 \
              manikcse/next-japan:latest  # Match image name above
         # Add other options like volumes, env vars, etc.
