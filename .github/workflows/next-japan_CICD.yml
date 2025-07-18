@@ -78,7 +78,7 @@ jobs:
       - name: Install Docker
         run: |
           # Remove old Docker versions
-          # sudo apt-get remove -y docker docker-engine docker.io containerd runc
+          sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
           # Install dependencies
           sudo apt-get update
@@ -103,13 +103,13 @@ jobs:
 
           # Verify installation
           sudo usermod -aG docker $USER
-          docker run hello-world
+          sudo docker run hello-world
         shell: bash
       - name: Pull Docker Image
         run: |
           # For private images:
           # echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          docker pull manikcse/next-japan:latest  # Replace with your image
+          sudo docker pull manikcse/next-japan:latest  # Replace with your image
 
       - name: Run Docker Container
         run: |
