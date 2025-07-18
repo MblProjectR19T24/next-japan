@@ -66,5 +66,7 @@ jobs:
       with:
         context: .
         push: true
-        tags: manikcse/next-japan:latest
+        tags: |
+              manikcse/next-japan:latest
+              manikcse/next-japan:${{ github.sha }}
         file: ./Dockerfile
