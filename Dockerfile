@@ -2,6 +2,7 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
+COPY . .
 #RUN npm install --save-dev @tailwindcss/postcss
 #RUN npm ci --only=production
 RUN npm ci
@@ -14,7 +15,10 @@ WORKDIR /app
 ENV NODE_ENV production
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/build ./build  # Replace /app/build with your output directory
+COPY --from=builder /app/lib ./lib # Replace /app/build with your output directory
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/src ./src
+
 
 EXPOSE 3000
 CMD ["npm", "start"]  # Replace with your start command if different
