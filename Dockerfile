@@ -5,6 +5,7 @@ COPY package*.json ./
 COPY . .
 #RUN npm install --save-dev @tailwindcss/postcss
 #RUN npm ci --only=production
+RUN npm install
 RUN npm ci
 COPY . .
 RUN npm run build 
