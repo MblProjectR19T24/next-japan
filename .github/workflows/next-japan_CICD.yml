@@ -6,25 +6,25 @@ on:
     branches: [main, master]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # build:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+  #     - name: Set up Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
+  #     - name: Install dependencies
+  #       run: npm ci
 
-      - name: Lint
-        run: npm run lint
+  #     - name: Lint
+  #       run: npm run lint
 
-      - name: Build
-        run: npm run build
+  #     - name: Build
+  #       run: npm run build
 
   #build_project_and_sonar_scan:
    # name: Build and analyze
@@ -46,35 +46,35 @@ jobs:
    #       args: >
    #         -Dsonar.projectKey=sonar
   
-  buils_docker_image_and_push:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-    - uses: actions/checkout@v4
-   # - uses: Jagoda11/react-template@v1.1.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Build and Push Docker image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        push: true
-        tags: |
-              manikcse/next-japan:latest
-              manikcse/next-japan:${{ github.sha }}
-        file: ./Dockerfile
+  # buils_docker_image_and_push:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #  # - uses: Jagoda11/react-template@v1.1.0
+  #   - name: Login to Docker Hub
+  #     uses: docker/login-action@v3
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #       password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #   - name: Set up QEMU
+  #     uses: docker/setup-qemu-action@v3
+  #   - name: Set up Docker Buildx
+  #     uses: docker/setup-buildx-action@v3
+  #   - name: Build and Push Docker image
+  #     uses: docker/build-push-action@v6
+  #     with:
+  #       context: .
+  #       push: true
+  #       tags: |
+  #             manikcse/next-japan:latest
+  #             manikcse/next-japan:${{ github.sha }}
+  #       file: ./Dockerfile
       
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest 
-    needs: buils_docker_image_and_push
+    #needs: buils_docker_image_and_push
     steps:
 
       - name: Checkout code
