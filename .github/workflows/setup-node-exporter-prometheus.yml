@@ -112,6 +112,5 @@ jobs:
               static_configs:
                 - targets: ['localhost:9100']
             EOL
-
             sudo systemctl restart prometheus
           EOF
