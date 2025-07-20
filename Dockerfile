@@ -8,7 +8,7 @@ COPY . .
 RUN npm install
 RUN npm ci
 COPY . .
-RUN npm run build 
+ 
 
 # Stage 2: Serve the application
 FROM node:18-alpine
@@ -19,7 +19,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/lib ./lib  
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/src ./src
-
+RUN npm run build
 
 EXPOSE 3000
 CMD ["next", "build"]
