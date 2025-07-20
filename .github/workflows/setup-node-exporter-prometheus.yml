@@ -1,16 +1,117 @@
-name: Basic deploy
+name: Setup Node Exporter & Prometheus
+
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  Prometheus-Deploy:
+  setup-monitoring:
+    name: Install Node Exporter & Configure Prometheus
     runs-on: ubuntu-latest
+
+    env:
+      HOST: ${{ secrets.EC2_HOST }}                  # Public IP/DNS of your EC2
+      USER: ${{ secrets.EC2_USER }}                  # e.g. ubuntu or ec2-user
+      KEY: ${{ secrets.EC2_SSH_KEY }}                # Your private key (set in GitHub Secrets)
+
     steps:
-    - id: deploy
-      name: Deploy
-      uses: bitovi/github-actions-deploy-prometheus@v0
-      with:
-        aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ap-south-1
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup SSH key
+        run: |
+            echo "${{ secrets.EC2_SSH_KEY }}" > private_key.pem
+            chmod 600 private_key.pem
+
+      - name: Install Prometheus on EC2 (optional)
+        run: |
+            ssh -T -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+                # Download and install Prometheus
+                PROM_VERSION="2.52.0"
+                curl -LO https://github.com/prometheus/prometheus/releases/download/v$PROM_VERSION/prometheus-$PROM_VERSION.linux-amd64.tar.gz
+                tar xvf prometheus-$PROM_VERSION.linux-amd64.tar.gz
+                sudo mv prometheus-$PROM_VERSION.linux-amd64 /opt/prometheus
+                sudo ln -s /opt/prometheus/prometheus /usr/local/bin/prometheus
+                sudo ln -s /opt/prometheus/promtool /usr/local/bin/promtool
+
+                # Create Prometheus config
+                sudo tee /opt/prometheus/prometheus.yml > /dev/null <<EOL
+                global:
+                  scrape_interval: 15s
+
+                scrape_configs:
+                  - job_name: 'node_exporter'
+                    static_configs:
+                      - targets: ['localhost:9100']
+                EOL
+
+                # Create Prometheus systemd service
+                sudo tee /etc/systemd/system/prometheus.service > /dev/null <<EOL
+                [Unit]
+                Description=Prometheus
+                After=network.target
+
+                [Service]
+                ExecStart=/usr/local/bin/prometheus \
+                  --config.file=/opt/prometheus/prometheus.yml \
+                  --storage.tsdb.path=/opt/prometheus/data \
+                  --web.console.templates=/opt/prometheus/consoles \
+                  --web.console.libraries=/opt/prometheus/console_libraries
+                Restart=always
+
+                [Install]
+                WantedBy=multi-user.target
+                EOL
+
+                sudo systemctl daemon-reexec
+                sudo systemctl enable prometheus
+                sudo systemctl start prometheus
+              EOF
+
+      - name: Install Node Exporter
+        run: |
+          ssh -o StrictHostKeyChecking=no $USER@$HOST << 'EOF'
+            NODE_EXPORTER_VERSION="1.7.0"
+            cd /tmp
+            wget https://github.com/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+            tar xvfz node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+            sudo mv node_exporter-$NODE_EXPORTER_VERSION.linux-amd64/node_exporter /usr/local/bin/
+            sudo useradd -rs /bin/false node_exporter || true
+            sudo tee /etc/systemd/system/node_exporter.service > /dev/null << EOL
+            [Unit]
+            Description=Node Exporter
+            After=network.target
+
+            [Service]
+            User=node_exporter
+            ExecStart=/usr/local/bin/node_exporter
+
+            [Install]
+            WantedBy=default.target
+            EOL
+            sudo systemctl daemon-reexec
+            sudo systemctl daemon-reload
+            sudo systemctl enable node_exporter
+            sudo systemctl start node_exporter
+          EOF
+
+      - name: Configure Prometheus
+        run: |
+          ssh $USER@$HOST << 'EOF'
+            PROMETHEUS_CONFIG="/etc/prometheus/prometheus.yml"
+            BACKUP="/etc/prometheus/prometheus.yml.bak"
+
+            # Backup current config
+            sudo cp $PROMETHEUS_CONFIG $BACKUP
+
+            # Append job for node_exporter
+            sudo tee -a $PROMETHEUS_CONFIG > /dev/null << EOL
+
+            - job_name: 'node_exporter'
+              static_configs:
+                - targets: ['localhost:9100']
+            EOL
+
+            sudo systemctl restart prometheus
+          EOF
