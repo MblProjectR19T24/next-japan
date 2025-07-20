@@ -70,13 +70,11 @@ jobs:
   #             manikcse/next-japan:latest
   #             manikcse/next-japan:${{ github.sha }}
   #       file: ./Dockerfile
-      
   deploy:
     name: Deploy to EC2
-    runs-on: ubuntu-latest 
-    #needs: buils_docker_image_and_push
-    steps:
+    runs-on: ubuntu-latest
 
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -84,9 +82,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Set up Docker
-        uses: docker/setup-docker-action@v4
-        
+
+      - name: Build Docker image
+        run: |
+          docker build -t next-japan-app .
+
+      - name: Copy Docker image to EC2 via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "."
+          target: "~/next-japan"
+
       - name: SSH into EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -94,5 +103,8 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker pull manikcse/next-japan:latest
-            sudo docker run -d --name next-japan -p 3000:3000 manikcse/next-japan:latest
+            cd ~/next-japan
+            docker stop next-japan || true
+            docker rm next-japan || true
+            docker build -t next-japan-app .
+            docker run -d --name next-japan -p 3000:3000 next-japan-app  
