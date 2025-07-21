@@ -1,113 +1,114 @@
-name: CI/CD Pipeline for next-japan
-on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+#name: CI/CD Pipeline for next-japan
+# on:
+#   push:
+#     branches: [main, master]
+#   pull_request:
+#     branches: [main, master]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Build
-        run: npm run build
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
+#       - name: Install dependencies
+#         run: npm ci
+#       - name: Lint
+#         run: npm run lint
+#       - name: Build
+#         run: npm run build
 
-  build_project_and_sonar_scan:
-   name: Build and analyze
-   runs-on: ubuntu-latest
-   needs: build
-   steps:
-     - uses: actions/checkout@v4
-       with:
-         fetch-depth: 0 
-      #Shallow clones should be disabled for a better relevancy of analysis
-     - name: Show Sonar Project File
-       run: cat .sonar-project.properties
-     - uses: sonarsource/sonarqube-scan-action@master
-       env:
-         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-       with:
-         args: >
-           -Dsonar.projectKey=sonar
+#   build_project_and_sonar_scan:
+#    name: Build and analyze
+#    runs-on: ubuntu-latest
+#    needs: build
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 0 
+#       #Shallow clones should be disabled for a better relevancy of analysis
+#      - name: Show Sonar Project File
+#        run: cat .sonar-project.properties
+#      - uses: sonarsource/sonarqube-scan-action@master
+#        env:
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+#        with:
+#          args: >
+#            -Dsonar.projectKey=sonar
   
-  buils_docker_image_and_push:
-    runs-on: ubuntu-latest
-    needs: build_project_and_sonar_scan
-    steps:
-    - uses: actions/checkout@v4
-   # - uses: Jagoda11/react-template@v1.1.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Build and Push Docker image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        push: true
-        tags: |
-              manikcse/next-japan:latest
-              manikcse/next-japan:${{ github.sha }}
-        file: ./Dockerfile
+#   buils_docker_image_and_push:
+#     runs-on: ubuntu-latest
+#     needs: build_project_and_sonar_scan
+#     steps:
+#     - uses: actions/checkout@v4
+#    # - uses: Jagoda11/react-template@v1.1.0
+#     - name: Login to Docker Hub
+#       uses: docker/login-action@v3
+#       with:
+#         username: ${{ secrets.DOCKERHUB_USERNAME }}
+#         password: ${{ secrets.DOCKERHUB_TOKEN }}
+#     - name: Set up QEMU
+#       uses: docker/setup-qemu-action@v3
+#     - name: Set up Docker Buildx
+#       uses: docker/setup-buildx-action@v3
+#     - name: Build and Push Docker image
+#       uses: docker/build-push-action@v6
+#       with:
+#         context: .
+#         push: true
+#         tags: |
+#               manikcse/next-japan:latest
+#               manikcse/next-japan:${{ github.sha }}
+#         file: ./Dockerfile
       
-  deploy:
-    runs-on: self-hosted  # Uses your EC2 runner
-    needs: buils_docker_image_and_push
-    steps:
-      - name: Install Docker
-        run: |
-          # Remove old Docker versions
-          # sudo apt-get remove -y docker docker-engine docker.io containerd runc
+#   deploy:
+#     runs-on: self-hosted  # Uses your EC2 runner
+#     needs: buils_docker_image_and_push
+#     steps:
+#       - name: Install Docker
+#         run: |
+#           # Remove old Docker versions
+#           # sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
-          # Install dependencies
-          sudo apt-get update
-          sudo apt-get install -y \
-            ca-certificates \
-            curl \
-            gnupg \
-            lsb-release
+#           # Install dependencies
+#           sudo apt-get update
+#           sudo apt-get install -y \
+#             ca-certificates \
+#             curl \
+#             gnupg \
+#             lsb-release
 
-          # Add Docker's GPG key
-          sudo mkdir -p /etc/apt/keyrings
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+#           # Add Docker's GPG key
+#           sudo mkdir -p /etc/apt/keyrings
+#           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-          # Setup repository
-          echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+#           # Setup repository
+#           echo \
+#             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+#             $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-          # Install Docker
-          sudo apt-get update
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+#           # Install Docker
+#           sudo apt-get update
+#           sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-          # Verify installation
-          sudo usermod -aG docker $USER
-          sudo docker run hello-world
-        shell: bash
-      - name: Pull Docker Image
-        run: |
-          # For private images:
-          # echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          sudo docker pull manikcse/next-japan:latest  # Replace with your image
+#           # Verify installation
+#           sudo usermod -aG docker $USER
+#           sudo docker run hello-world
+#         shell: bash
+#       - name: Pull Docker Image
+#         run: |
+#           # For private images:
+#           # echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+#           sudo docker pull manikcse/next-japan:latest  # Replace with your image
 
-      - name: Run Docker Container
-        run: |
-          sudo docker run -d \
-            --name next-japan -p 3000:3000 \
-             manikcse/next-japan:latest  # Match image name above
+#       - name: Run Docker Container
+#         run: |
+#           sudo docker run -d \
+#             --name next-japan -p 3000:3000 \
+#              manikcse/next-japan:latest  # Match image name above
+ 
