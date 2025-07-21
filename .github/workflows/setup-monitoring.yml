@@ -1,85 +1,79 @@
-name: Setup Prometheus and Grafana Monitoring
+name: Setup Monitoring Stack (Prometheus + Grafana)
 
 on:
   workflow_dispatch:
 
 jobs:
   deploy-monitoring:
+    name: Install Prometheus & Grafana on EC2
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install SSH client
-      run: sudo apt-get update && sudo apt-get install -y openssh-client
+      - name: Connect to EC2 and set up monitoring stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Update system
+            sudo apt update -y
 
-    - name: Copy SSH key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+            # Install Docker if not already installed
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com | sudo bash
+              sudo usermod -aG docker $USER
+            fi
 
-    - name: Deploy Dockerized Prometheus + Grafana
-      run: |
-        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          # Install Docker & Docker Compose if not present
-          if ! command -v docker &> /dev/null; then
-            curl -fsSL https://get.docker.com | sudo bash
-          fi
-          sudo usermod -aG docker $USER
+            # Create Docker Compose file
+            mkdir -p ~/monitoring
+            cd ~/monitoring
 
-          if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-          fi
+            cat > docker-compose.yml <<EOF
+            version: '3'
 
-          mkdir -p ~/monitoring
-          cd ~/monitoring
+            services:
+              prometheus:
+                image: prom/prometheus
+                ports:
+                  - "9090:9090"
+                volumes:
+                  - ./prometheus.yml:/etc/prometheus/prometheus.yml
 
-          # Create Docker Compose file
-          cat > docker-compose.yml << 'COMPOSE'
-          version: '3'
+              node-exporter:
+                image: prom/node-exporter
+                ports:
+                  - "9100:9100"
 
-          services:
-            prometheus:
-              image: prom/prometheus
-              volumes:
-                - ./prometheus.yml:/etc/prometheus/prometheus.yml
-              ports:
-                - "9090:9090"
+              grafana:
+                image: grafana/grafana
+                ports:
+                  - "3001:3000"
+                environment:
+                  - GF_SECURITY_ADMIN_USER=admin
+                  - GF_SECURITY_ADMIN_PASSWORD=admin
+                volumes:
+                  - grafana-data:/var/lib/grafana
 
-            node-exporter:
-              image: prom/node-exporter
-              ports:
-                - "9100:9100"
+            volumes:
+              grafana-data:
+            EOF
 
-            grafana:
-              image: grafana/grafana
-              ports:
-                - "3000:3000"
-              environment:
-                - GF_SECURITY_ADMIN_PASSWORD=admin
-              volumes:
-                - grafana-storage:/var/lib/grafana
+            # Create Prometheus config
+            cat > prometheus.yml <<EOF
+            global:
+              scrape_interval: 15s
 
-          volumes:
-            grafana-storage:
-          COMPOSE
+            scrape_configs:
+              - job_name: 'prometheus'
+                static_configs:
+                  - targets: ['localhost:9090']
 
-          # Prometheus configuration
-          cat > prometheus.yml << 'PROMYAML'
-          global:
-            scrape_interval: 15s
+              - job_name: 'node-exporter'
+                static_configs:
+                  - targets: ['localhost:9100']
+            EOF
 
-          scrape_configs:
-            - job_name: 'prometheus'
-              static_configs:
-                - targets: ['localhost:9090']
-
-            - job_name: 'node-exporter'
-              static_configs:
-                - targets: ['node-exporter:9100']
-          PROMYAML
-
-          # Start the stack
-          docker-compose up -d
-        EOF
+            # Start stack
+            docker compose down
+            docker compose up -d
