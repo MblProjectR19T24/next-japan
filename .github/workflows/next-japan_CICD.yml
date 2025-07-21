@@ -69,7 +69,7 @@ jobs:
   deploy:
      name: Deploy to EC2
      runs-on: ubuntu-latest
-
+     needs: buils_docker_image_and_push
      steps:
       - name: Checkout code
         uses: actions/checkout@v4
