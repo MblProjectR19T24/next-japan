@@ -1,0 +1,85 @@
+name: Setup Prometheus and Grafana Monitoring
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install SSH client
+      run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+    - name: Copy SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy Dockerized Prometheus + Grafana
+      run: |
+        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          # Install Docker & Docker Compose if not present
+          if ! command -v docker &> /dev/null; then
+            curl -fsSL https://get.docker.com | sudo bash
+          fi
+          sudo usermod -aG docker $USER
+
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+
+          mkdir -p ~/monitoring
+          cd ~/monitoring
+
+          # Create Docker Compose file
+          cat > docker-compose.yml << 'COMPOSE'
+          version: '3'
+
+          services:
+            prometheus:
+              image: prom/prometheus
+              volumes:
+                - ./prometheus.yml:/etc/prometheus/prometheus.yml
+              ports:
+                - "9090:9090"
+
+            node-exporter:
+              image: prom/node-exporter
+              ports:
+                - "9100:9100"
+
+            grafana:
+              image: grafana/grafana
+              ports:
+                - "3000:3000"
+              environment:
+                - GF_SECURITY_ADMIN_PASSWORD=admin
+              volumes:
+                - grafana-storage:/var/lib/grafana
+
+          volumes:
+            grafana-storage:
+          COMPOSE
+
+          # Prometheus configuration
+          cat > prometheus.yml << 'PROMYAML'
+          global:
+            scrape_interval: 15s
+
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+
+            - job_name: 'node-exporter'
+              static_configs:
+                - targets: ['node-exporter:9100']
+          PROMYAML
+
+          # Start the stack
+          docker-compose up -d
+        EOF
